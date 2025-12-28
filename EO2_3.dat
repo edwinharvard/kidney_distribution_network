@@ -1,0 +1,6 @@
+param num_patients := 50;
+
+param C := 
+    ;
+
+read {i in PATIENTS, j in PATIENTS} C[i,j] < 50_raw.txt;

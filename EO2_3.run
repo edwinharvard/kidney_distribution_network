@@ -1,0 +1,78 @@
+reset;
+
+model EO2_3.mod;
+data EO2_3.dat;
+
+option solver cplex;
+option solver_msg 1;
+
+# CPLEX options: timing + MIP node log
+option cplex_options 'timing=1 mipdisplay=2 mipinterval=5';
+
+# Stage 1: minimize epsilon sum, while still being feasible
+objective kidney_delivery;
+solve;
+
+    
+# 1. Declare a matrix for directed transplants i -> j
+var out_matrix {i in PATIENTS, j in PATIENTS};
+
+# 2. Initialize to 0 (no transplant)
+let {i in PATIENTS, j in PATIENTS} out_matrix[i,j] := 0;
+
+# 3. Fill from selected 2-cycles
+# C2 is defined only for i < j, so we manually set both directions
+for {(i,j) in C2: X2[i,j] > 0.5} {
+    let out_matrix[i,j] := 1;
+    let out_matrix[j,i] := 1;
+}
+
+# 4. Fill from selected 3-cycles: i -> j, j -> k, k -> i
+for {(i,j,k) in C3: X3[i,j,k] > 0.5} {
+    let out_matrix[i,j] := 1;
+    let out_matrix[j,k] := 1;
+    let out_matrix[k,i] := 1;
+}
+
+# 5. Export as an n x n 0/1 matrix to kidney3_10.out
+# (one row per patient i)
+for {i in PATIENTS} {
+    printf {j in PATIENTS} "%d ", out_matrix[i,j] > "kidney3_50.out";
+    printf "\n" >> "kidney3_50.out";
+}
+
+# 6. STATS FOR WRITE-UP
+
+# total number of patient–donor pairs
+param total_pairs := card(PATIENTS);
+
+# number of matched pairs: patients with at least one outgoing transplant
+param matched_pairs integer;
+let matched_pairs := 0;
+for {i in PATIENTS} {
+    if sum {j in PATIENTS} out_matrix[i,j] >= 1 then
+        let matched_pairs := matched_pairs + 1;
+}
+
+# number of 2-cycles and 3-cycles used in the solution
+param num_2cycles integer;
+param num_3cycles integer;
+
+let num_2cycles :=
+    sum {(i,j) in C2} (if X2[i,j] > 0.5 then 1 else 0);
+
+let num_3cycles :=
+    sum {(i,j,k) in C3} (if X3[i,j,k] > 0.5 then 1 else 0);
+
+# print summary to the AMPL console
+printf "\n===== Kidney Exchange Summary (2- and 3-cycles) =====\n";
+printf "Total patient–donor pairs         : %d\n", total_pairs;
+printf "Matched patient–donor pairs       : %d\n", matched_pairs;
+printf "Percentage matched                : %.2f%%\n",
+       100.0 * matched_pairs / total_pairs;
+printf "Number of 2-cycles in solution    : %d\n", num_2cycles;
+printf "Number of 3-cycles in solution    : %d\n", num_3cycles;
+printf "Average cycle length              : %.3f\n",
+       (2 * num_2cycles + 3 * num_3cycles) / (num_2cycles + num_3cycles);
+printf "Reminder: start logging with `log EO2_3_run;` before including this file.\n";
+printf "===============================================\n";
