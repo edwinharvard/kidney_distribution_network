@@ -1,2 +1,4 @@
 # kidney_distribution_network
 Integer Programming Model for a Kidney Distribution Network with Cycle Formulations
+
+![Paths of possible kidney transplants from donor-patient pair i to j](100.png)
